@@ -658,4 +658,4 @@ Congratulations! You've just completed an introduction to the Fn Java
 FDK.  There's so much more in the FDK than we can cover in a brief
 introduction but we'll go deeper in subsequent tutorials.
 
-**Go:** [Back to Contents](../README.md)
+**Go:** [Contents](../README.md)
