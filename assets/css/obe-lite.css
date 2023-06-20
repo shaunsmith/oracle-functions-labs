@@ -33,15 +33,14 @@ h2 {
 	line-height: 1.2em;
     color: black;
     background-color: #E4F0FA;
-	margin: 1rem 0 1rem 1rem;
+	margin: 2rem 0 1rem 1rem;
     padding: 5px 0px 5px 5px;
 }
 
 h3 {
 	font-size: 1.2rem;
 	line-height: 1.2em;
-	font-weight: normal;
-    color: #145C93;
+	color: #222222;
 	margin: 1rem 0 1rem 1rem;
 }
 
@@ -50,7 +49,7 @@ h4 {
 	font-size: 1.1rem;
 	line-height: 1.2em;
 	font-weight: normal;
-    color: #145C93;
+	color: #171717;
 	margin: 0.8rem 0 0.8rem 1rem;
 }
 
@@ -101,6 +100,29 @@ hr {
 	margin-top: 0.5rem;
     margin-bottom: 1rem;
 }
+
+table{
+    width: 100%;
+    border-collapse: collapse;
+    margin-left: 1em;
+}
+
+table td{
+    padding:7px; border: gray 1px solid;
+}
+
+table tr{
+    background: white;
+}
+
+table tr:nth-child(odd){
+    background: white;
+}
+
+table tr:nth-child(even){
+    background:#F6F8FA;
+}
+
 
 #content {
 	position: relative;

@@ -82,7 +82,6 @@ break the function so it won't compile. Comment out the return statement in the
 `HelloFunction` class' `handleRequest` function by putting `//` in front of the
 `return` statement so it looks like:
 
-![user input](images/userinput.png)
 ```java
 package com.example.fn;
 
@@ -112,7 +111,7 @@ Error during build. Run with `--verbose` flag to see what went wrong. eg: `fn --
 
 Fn: error running docker build: exit status 1
 
-See 'fn <command> --help' for more information. Client version: 0.5.16
+See 'fn <command> --help' for more information. Client version: 0.5.86
 ```
 
 Now let's try the build with the `--verbose` flag, which you need to put 
@@ -128,8 +127,8 @@ Now we see details of the build and the failure (output abbreviated):
 ```sh
 Building image trouble:0.0.1
 Sending build context to Docker daemon  10.24kB
-Step 1/11 : FROM fnproject/fn-java-fdk-build:jdk9-1.0.56 as build-stage
- ---> dbeadad33cac
+Step 1/11 : FROM fnproject/fn-java-fdk-build:jdk11-1.0.102 as build-stage
+ ---> cc41c56dd693
 ...
 [INFO] --- maven-compiler-plugin:3.3:compile (default-compile) @ hello ---
 [INFO] Changes detected - recompiling the module!
@@ -137,11 +136,11 @@ Step 1/11 : FROM fnproject/fn-java-fdk-build:jdk9-1.0.56 as build-stage
 [INFO] -------------------------------------------------------------
 [ERROR] COMPILATION ERROR :
 [INFO] -------------------------------------------------------------
-[ERROR] /function/src/main/java/com/example/fn/HelloFunction.java:[13,5] missing return statement
+[ERROR] /function/src/main/java/com/example/fn/HelloFunction.java:[9,5] missing return statement
 [INFO] 1 error
 ...
 [ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.3:compile (default-compile) on project hello: Compilation failure
-[ERROR] /function/src/main/java/com/example/fn/HelloFunction.java:[13,5] missing return statement
+[ERROR] /function/src/main/java/com/example/fn/HelloFunction.java:[9,5] missing return statement
 ...
 The command 'mvn package' returned a non-zero code: 1
 ...
@@ -154,24 +153,28 @@ error message telling us we're missing a return statement--as we expected.
 When an unexpected error happens, verbose output is the first thing you need to
 enable to diagnose the issue.
 
-## Logs
 
-When calling a deployed function, Fn captures all standard error output and sends
-it to a syslog server, if configured. So if you have a
-function throwing an exception and the stack trace is being written to standard
-error it's straightforward to get that stack trace via syslog.
+## Cause a Runtime Error
+Let's update our sample function to throw a Runtime exception. Then we can explore the options for getting details of what happened.
 
-Let's update our HelloFunction so that it throws an exception in the
-`handleRequst` method.  Replace the definition of HelloFunction with the
-following:
+Create the `tutorial` application to store our test function.
 
 ![user input](images/userinput.png)
+>```sh
+> fn create app tutorial
+>```
+
+Let's update our HelloFunction so that it writes an error message and then
+throws an exception in the `handleRequst` method.  Replace the definition of
+HelloFunction with the following:
+
 ```java
 package com.example.fn;
 
 public class HelloFunction {
 
     public String handleRequest(String input) {
+        System.err.println("Something wrong is going to happen");
         throw new RuntimeException("Something went horribly wrong!");
     }
 
@@ -185,7 +188,7 @@ Fn server running locally you can follow the
 ![user input](images/userinput.png)
 >```sh
 > fn deploy --app tutorial --local
-```
+>```
 
 ```sh
 Deploying trouble to app: tutorial
@@ -202,14 +205,14 @@ the functions of the 'tutorial' app:
 ![user input](images/userinput.png)
 >```sh
 > fn ls functions tutorial
-```
+>```
 
 Or the slightly more economical:
 
 ![user input](images/userinput.png)
 >```sh
 > fn ls f tutorial
-```
+>```
 
 ```sh
 NAME     IMAGE          ID
@@ -224,18 +227,70 @@ With the function defined let's invoke it and see what happens when if fails:
 >```
 
 ```sh
-Fn: Error calling function: status 502
-
-See 'fn <command> --help' for more information. Client version: 0.5.16
+Error invoking function. status: 502 message: function failed
 ```
 
 This is not much information to go on to debug the problem.  What we need to
 do is look at the logs!
 
-### Log Capture
+
+## Log to Terminal Window with DEBUG
+When working with Fn locally, you have the option to turn on DEBUG logging using the `fn start` command. This causes detailed information about functions to be output to the terminal where Fn server was started.
+
+To enable DEBUG logging for Fn server, restart the server with the following command:
+
+![user input](images/userinput.png)
+>```sh
+> fn start --log-level DEBUG
+>```
+
+```sh
+2019/12/19 09:26:27 ¡¡¡ 'fn start' should NOT be used for PRODUCTION !!! see https://github.com/fnproject/fn-helm/
+time="2019-12-19T16:26:28Z" level=info msg="Setting log level to" fields.level=DEBUG
+...
+```
+Notice in the first couple of messages state that the log level is set to debug.
+
+Now invoke the function again. This time, looks for out put in the terminal window where the server was started.
+
+![user input](images/userinput.png)
+>```sh
+> fn invoke tutorial trouble
+>```
+
+Here is the log output for Fn server:
+```sh
+time="2019-12-19T16:27:55Z" level=info msg="starting call" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 container_id=01DWFFS7QZNG8G00GZJ0000004 fn_id=01DWFFRQVQNG8G00GZJ0000002
+time="2019-12-19T16:27:55Z" level=debug msg="Something wrong is going to happen\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="An error occurred in function: Something went horribly wrong!\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="Caused by: java.lang.RuntimeException: Something went horribly wrong! ...\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="    at com.example.fn.HelloFunction.handleRequest(HelloFunction.java:7)\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="    at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="    at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="    at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="    at java.base/java.lang.reflect.Method.invoke(Unknown Source)\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="Got resp from UDS socket" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 resp="&{502 FunctionError 502 HTTP/1.1 1 1 map[Content-Type:[application/octet-stream]] {0xc420183260} -1 [] true false map[] 0xc42029b700 <nil>}"
+time="2019-12-19T16:27:55Z" level=error msg="api error" action="server.handleFnInvokeCall)-fm" code=502 error="function failed" fn_id=01DWFFRQVQNG8G00GZJ0000002
+time="2019-12-19T16:27:55Z" level=debug msg="docker pause" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000004 container_id=01DWFFS7QZNG8G00GZJ0000004 cpus= fn_id=01DWFFRQVQNG8G00GZJ0000002 idle_timeout=30 image="fndemouser/trouble:0.0.2" memory=128 stack=Freeze
+```
+These key lines shows us what went wrong.
+```sh
+time="2019-12-19T16:27:55Z" level=debug msg="Caused by: java.lang.RuntimeException: Something went horribly wrong! ...\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+time="2019-12-19T16:27:55Z" level=debug msg="    at com.example.fn.HelloFunction.handleRequest(HelloFunction.java:7)\n" action="server.handleFnInvokeCall)-fm" app_id=01DWFFR290NG8G00GZJ0000001 call_id=01DWFFS7QZNG8G00GZJ0000003 fn_id=01DWFFRQVQNG8G00GZJ0000002 image="fndemouser/trouble:0.0.2" user_log=true
+```
+A Runtime Exception was thrown on line 7 of the HelloFunction.
+
+Running the Fn server with the DEBUG log level is a great way to track down any issues you are having with your functions.
+
+
+## Log Capture to a Logging Service
+When calling a deployed function, Fn captures all standard error output and sends it to a syslog server, if configured. So if you have a
+function throwing an exception and the stack trace is being written to standard
+error it's straightforward to get that stack trace via syslog.
 
 We need to capture the logs for the function so that we can see what happens
-when it fails.  To capture logs you need to configure the `tutoral` application
+when it fails.  To capture logs you need to configure the `tutorial` application
 with the URL of a syslog server.  You can do this either when you create an
 app or after it's been created.  
 
@@ -289,11 +344,11 @@ Which will return JSON looking something like:
 
 ```sh
 {
-	"created_at": "2018-10-17T19:27:59.047Z",
+	"created_at": "2019-10-13T14:54:45.459Z",
 	"id": "01CT1QZFJ7NG8G00GZJ0000001",
 	"name": "tutorial",
 	"syslog_url": "tcp://logs7.papertrailapp.com:NNNN",
-	"updated_at": "2018-10-17T19:56:39.819Z"
+	"updated_at": "2019-10-13T15:55:50.628Z"
 }
 ```
 
@@ -315,8 +370,8 @@ click on our "System" to open a page with the log showing our exception.
 You can leave the Papertrail log view open while debugging to monitor the log
 output in near realtime.  Give it a try!
 
-## DEBUG=1
 
+## Viewing HTTP Headers with DEBUG=1
 If you're interacting with functions via the `fn` CLI, you can enable debug
 mode to see the full details of the HTTP requests going to the Fn server and
 the responses. The `fn` CLI simply wraps the Fn API to make it easier to
@@ -342,13 +397,14 @@ Accept-Encoding: gzip
 
 
 HTTP/1.1 200 OK
-Content-Length: 196
+Content-Length: 977
 Content-Type: application/json; charset=utf-8
-Date: Wed, 17 Oct 2018 19:22:39 GMT
+Date: Sun, 13 Oct 2019 16:45:56 GMT
 
-{"items":[{"id":"01CSZ9NG1KNG8G00GZJ0000006","name":"tutorial","syslog_url":"tcp://logs7.papertrailapp.com:NNNN","created_at":"2018-10-16T20:39:22.931Z","updated_at":"2018-10-17T19:04:26.971Z"}]}
+
+{"items":[{"id":"01DQ2STN6KNG8G00GZJ000001Q","name":"tutorial","syslog_url":"tcp://logs3.papertrailapp.com:NNNN","created_at":"2019-10-13T14:54:45.459Z","updated_at":"2019-10-13T15:55:50.628Z"}]}
 NAME		ID
-tutorial	01CSZ9NG1KNG8G00GZJ0000006
+tutorial	01DQ2STN6KNG8G00GZJ000001Q
 ```
 
 All debug output is written to stderr while the normal response is written
@@ -357,6 +413,6 @@ to stdout so it's easy to capture or pipe either for processing.
 ## Wrapping Up
 
 That's brief intro to troubleshooting techniques for Fn today.  We'll update
-this tutorial as new features become available.
+this tutorial should new features become available.
 
 **Go:** [Back to Contents](../README.md)
